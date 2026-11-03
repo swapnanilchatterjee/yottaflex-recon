@@ -1,0 +1,13 @@
+RECONCILIATION ENGINE BENCHMARK EVIDENCE
+Orders volume: 100,000
+Ingestion:          0.793 s
+Validation & Dedup: 33.803 s
+Transformation:     13.797 s
+Publish:            0.631 s
+Reconciliation:     49.255 s
+Total end-to-end:   98.280 s
+
+OPTIMIZATION STUDY (15,000 rows sample):
+Naive iterrows loop:     2.445 s
+Vectorised merge diff:   0.104 s
+Speedup:                 23.6x
