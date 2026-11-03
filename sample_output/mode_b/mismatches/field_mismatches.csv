@@ -1,0 +1,3 @@
+entity,business_key,column,source_value,target_value,mismatch_type
+orders,O00000009,status,delivered,cancelled,VALUE_MISMATCH
+orders,O00000007,amount,0.00,15.00,NUMERIC_DIFF

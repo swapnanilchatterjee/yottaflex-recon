@@ -1,0 +1,264 @@
+# YottaFlex Data Reconciliation & Pipeline Tool
+
+A deterministic data engineering pipeline and 4-tier reconciliation engine built in Python and Pandas. Ingests source customer and order extracts, enforces validation and foreign-key integrity, quarantines defective rows with exact line-number traceability, transforms deterministically, publishes target analytical datasets idempotently, and performs multi-level reconciliation to isolate all data discrepancies.
+
+---
+
+## 1. Quick Start
+
+Run these commands in a clean environment to verify setup, automated tests, and live demo runs:
+
+```bash
+# 1. Clone repository
+git clone https://github.com/swapnanilchatterjee/yottaflex-recon.git
+cd yottaflex-recon
+
+# 2. Install dependencies (or run via virtual environment)
+pip install -r requirements.txt
+pip install -e .
+
+# 3. Run full automated test suite (35 tests pass in ~1.3s)
+python -m pytest -v
+
+# 4. Run end-to-end demonstration (Mode A clean run & Mode B defect detection)
+make demo
+```
+
+*(Note: If `make` is not available on Windows, you can execute the demo commands directly via Python:)*
+```bash
+# Generate sample test datasets with defect injection
+python -m recon generate --out data/sample --customers 50 --orders 200 --seed 42
+
+# Mode A: Execute ingestion, transformation, and publishing
+python -m recon run --source-dir data/sample/source --target-dir output/target --out-dir output/mode_a
+
+# Mode A: Reconcile published target against source (0 unexplained differences)
+python -m recon reconcile --source-dir data/sample/source --target-dir output/target --out-dir output/mode_a
+
+# Mode B: Reconcile against drifted target (detects and isolates all 8 injected defects)
+python -m recon reconcile --source-dir data/sample/source --target-dir data/sample/target_drifted --out-dir output/mode_b
+```
+
+---
+
+## 2. What `make demo` Shows
+
+The demo operates in two complementary verification modes:
+
+1. **Mode A — Ingest, Publish & Verify Clean Target:**
+   - Ingests `customers.csv` and `orders.csv`.
+   - Validates rules, deduplicates intra-batch events by latest `updated_at`, and quarantines invalid rows to `output/mode_a/rejects/`.
+   - Publishes target clean datasets: `output/target/dim_customers.csv` and `fact_orders.csv`.
+   - Executes reconciliation: **Exits with code 0 (PASS)**. Demonstrates that `source_raw_rows = expected_target_rows + rejected_rows`.
+2. **Mode B — Audit Drifted / Corrupted Target:**
+   - Reconciles source files against `data/sample/target_drifted/` (an independently produced target with deliberate deletions, extra rows, duplicate keys, and field drifts).
+   - **Exits with code 1 (FAIL - Mismatches Detected)**.
+   - Accurately captures 100% of the injected defects into `output/mode_b/mismatches/` (`missing_in_target.csv`, `extra_in_target.csv`, `duplicate_in_target.csv`, `field_mismatches.csv`).
+   - A committed reference of these outputs is available under `sample_output/`.
+
+---
+
+## 3. Architecture & Data Flow
+
+```mermaid
+flowchart LR
+    A[source/*.csv] --> B[ingest<br/>stdlib csv, line tracking]
+    B -->|malformed rows| Q[(rejects/quarantine)]
+    B --> C[validate<br/>schema, rules, dedup, FK]
+    C -->|invalid / superseded| Q
+    C --> D[transform<br/>normalise + derive]
+    D --> E[publish<br/>atomic upsert, updated_at guard]
+    E --> T[(target/*.csv)]
+    A -.-> R[reconcile engine]
+    T --> R
+    R --> P[reconciliation_report.json]
+    R --> M[mismatches/*.csv]
+    B & C & D & E & R --> L[run_manifest.json + run_log.jsonl]
+```
+
+### Module Responsibilities
+
+| Module | Location | Primary Responsibility |
+| :--- | :--- | :--- |
+| `recon.schemas` | `src/recon/schemas.py` | Schema specifications, regexes, reject codes, and lineage constants. |
+| `recon.ingest` | `src/recon/ingest.py` | Resilient CSV parsing, physical line tracking, and ragged row quarantine. |
+| `recon.validate` | `src/recon/validate.py` | Constraint checking, business key deduplication, and FK referential checks. |
+| `recon.transform`| `src/recon/transform.py` | Pure deterministic transforms, Decimal `ROUND_HALF_UP`, UTC dates, amount banding. |
+| `recon.publish` | `src/recon/publish.py` | Atomic idempotent publishing with `updated_at` stale guard. |
+| `recon.reconcile`| `src/recon/reconcile.py` | 4-tier comparison engine: counts, keys, aggregates, and vectorised field diffs. |
+| `recon.report` | `src/recon/report.py` | Serialization to `reconciliation_report.json` and isolated mismatch CSVs. |
+| `recon.runlog` | `src/recon/runlog.py` | Deterministic `run_id`, structured logging, and JSON execution manifests. |
+| `recon.generator`| `src/recon/generator.py` | Seeded synthetic data generator with defect injection and labelled answers. |
+
+Detailed architecture documentation is available in [docs/architecture.md](docs/architecture.md).
+
+---
+
+## 4. Data Model & Entities
+
+The pipeline models an e-commerce domain with two relational entities:
+
+- **`customers` (Parent Entity):** One row per customer (`customer_id` format `^C\d{6}$`). Ingested into target `dim_customers`.
+- **`orders` (Child Entity):** One row per order event (`order_id` format `^O\d{8}$`), enforcing a strict foreign-key relationship (`orders.customer_id -> customers.customer_id`). Ingested into target `fact_orders`.
+
+Target datasets include lineage columns (`source_file`, `run_id`). Lineage columns are explicitly excluded during reconciliation comparison to prevent false drift alerts.
+
+Complete field-level constraints, types, and derivations are documented in [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md).
+
+---
+
+## 5. Naming & Lineage Conventions
+
+- **Tables and Columns:** Strict `snake_case` across all source and target datasets.
+- **Timestamps:** Canonical ISO-8601 UTC with explicit `Z` suffix (`YYYY-MM-DDTHH:MM:SSZ`).
+- **Deterministic Run ID:** Derived from the SHA-256 hash of all input file bytes concatenated with the pipeline version:
+  $$\text{run\_id} = \text{"run\_"} + \text{SHA256}(\text{bytes} + \text{PIPELINE\_VERSION})[:12]$$
+  Rerunning the pipeline on identical input files guarantees an identical `run_id`.
+
+---
+
+## 6. Business Rules & Quarantine Policy
+
+No record is ever silently dropped. Every rejected record is persisted to `rejects/<entity>_rejects.csv` containing: `run_id, source_file, source_line_number, entity, business_key, reason_code, reason_detail, raw_record`.
+
+| Reject Reason Code | Triggering Condition |
+| :--- | :--- |
+| `MALFORMED_ROW` | Ragged row in source file (field count does not match header count). |
+| `MISSING_REQUIRED` | Any mandatory field is empty after whitespace trimming. |
+| `INVALID_FORMAT` | Business key or field violates regex (e.g. `customer_id` not matching `^C\d{6}$`). |
+| `INVALID_TYPE` | Timestamp string cannot be parsed as ISO-8601, or amount is not a valid decimal. |
+| `INVALID_VALUE` | Amount < 0.00 or > 1,000,000.00; status not in allowed set; currency not in allowed set; `updated_at < created_at`. |
+| `FUTURE_TIMESTAMP` | Order timestamp is in the future relative to pipeline execution time. |
+| `INVALID_FK` | Order references a `customer_id` not present in valid customer records. |
+| `DUPLICATE_SUPERSEDED` | Intra-batch duplicate key: earlier version superseded by version with higher `updated_at`. |
+
+---
+
+## 7. 4-Tier Reconciliation Methodology
+
+Reconciliation operates across 4 complementary tiers:
+
+```
+Tier 1: Row Count Equation   -> source_raw = expected_target + rejected (unexplained gap == 0)
+Tier 2: Business Key Sets    -> missing_in_target, extra_in_target, duplicate_in_target
+Tier 3: Domain Aggregates    -> sum(amount) [tol=0.005], min/max, distinct customers
+Tier 4: Vectorised Field Diff-> Inner-join on PK; NumPy vectorised comparison of payload attributes
+```
+
+### Exit Codes for Orchestration
+- `0` — **Clean PASS:** 0 unexplained count differences, 0 key differences, 0 aggregate failures, 0 field mismatches.
+- `1` — **Reconciliation FAIL:** Discrepancies detected and isolated into CSVs.
+- `2` — **Fatal Pipeline Error:** Missing required header columns, zero-byte source files, or file unreadable.
+
+---
+
+## 8. Idempotency, Reruns, and Late Data
+
+1. **Rerun Invariance:** Re-executing `python -m recon run` on identical source data produces:
+   - Identical target file SHA-256 hashes.
+   - Run metrics: `{'inserted': 0, 'updated': 0, 'unchanged': N, 'skipped_stale': 0}`.
+2. **Late-Arriving Stale Data Guard:** Target updating evaluates version timestamps (`updated_at_utc`). Incoming records with older version timestamps than existing target records are counted as `skipped_stale` and prevented from clobbering newer analytical data.
+3. **Crash Protection (Atomic Swaps):** Target CSVs are written to temporary files (`tmp_publish_*.csv`) in the destination directory and replaced atomically via `os.replace`. A crashed job leaves the previous verified target intact.
+
+---
+
+## 9. QA Test Report (Tester Verification)
+
+A comprehensive quality assurance suite was executed covering unit, negative, boundary, edge-case, idempotency, and integration scenarios.
+
+### 9.1 Test Execution Summary
+- **Test Runner:** `pytest 9.2.0`
+- **Total Test Cases:** **35 Passed** (0 Failed, 0 Skipped)
+- **Execution Time:** **1.27 seconds**
+- **Test Evidence File:** `docs/evidence/pytest.txt`
+
+### 9.2 QA Test Matrix & Coverage
+
+| Test Category | Test File & Name | Target Scenario | Verification Result |
+| :--- | :--- | :--- | :--- |
+| **Ingestion Resilience** | `test_ingest.py::test_zero_byte_file` | Zero-byte source CSV | `EMPTY_FILE_NO_HEADER` raised |
+| **Ingestion Resilience** | `test_ingest.py::test_missing_file_raises_not_found` | Missing CSV file path | `FILE_NOT_FOUND` raised |
+| **Ingestion Resilience** | `test_ingest.py::test_missing_column_fails_with_schema_error`| Header missing mandatory column | `SCHEMA_MISSING_COLUMNS` raised |
+| **Ingestion Resilience** | `test_ingest.py::test_extra_column_ignored_with_warning` | Extra column in source CSV | Column ignored, warning logged |
+| **Ingestion Resilience** | `test_ingest.py::test_malformed_row_quarantined` | Ragged row (too few/many fields) | Quarantined `MALFORMED_ROW` with line # |
+| **Validation Rules** | `test_validate.py::test_row_conservation` | Invariant: `input == valid + rejects` | Exact row conservation verified |
+| **Validation Rules** | `test_validate.py::test_missing_required` | Blank required string field | Quarantined `MISSING_REQUIRED` |
+| **Validation Rules** | `test_validate.py::test_null_email_allowed` | Null/empty email address | Validated; email blank in target |
+| **Validation Rules** | `test_validate.py::test_duplicate_keeps_latest` | Duplicate key with newer `updated_at` | Newer kept, older `DUPLICATE_SUPERSEDED` |
+| **Validation Rules** | `test_validate.py::test_exact_duplicate` | Identical duplicate event lines | One kept, duplicate superseded |
+| **Validation Rules** | `test_validate.py::test_out_of_order_duplicates` | Newer record appears first in file | Highest `updated_at` wins |
+| **Validation Rules** | `test_validate.py::test_orphan_customer_rejected` | Order with unknown customer ID | Quarantined `INVALID_FK` |
+| **Validation Rules** | `test_validate.py::test_future_timestamp_rejected`| Order timestamp in the future | Quarantined `FUTURE_TIMESTAMP` |
+| **Validation Rules** | `test_validate.py::test_invalid_customer_id_format`| Customer ID without `C` prefix | Quarantined `INVALID_FORMAT` |
+| **Validation Rules** | `test_validate.py::test_invalid_country_code_format`| Country code with 3 letters | Quarantined `INVALID_FORMAT` |
+| **Validation Rules** | `test_validate.py::test_updated_at_earlier_than_created_at_rejected`| `updated_at < created_at` | Quarantined `INVALID_VALUE` |
+| **Validation Rules** | `test_validate.py::test_amount_out_of_range_rejected`| Negative amount & amount > 1M | Quarantined `INVALID_VALUE` |
+| **Validation Rules** | `test_validate.py::test_invalid_status_and_currency_rejected`| Unrecognized status and currency | Quarantined `INVALID_VALUE` |
+| **Transformations** | `test_transform.py::test_amount_rounding_half_up` | Decimal HALF_UP quantisation | `10.005 -> 10.01`, `10.004 -> 10.00` |
+| **Transformations** | `test_transform.py::test_band_boundaries` | Boundary values 99.99/100/999.99/1000 | Correct `low`/`medium`/`high` bands |
+| **Transformations** | `test_transform.py::test_offset_to_utc` | Timezone offset `+05:30` | Normalised to UTC ending in `Z` |
+| **Transformations** | `test_transform.py::test_status_currency_normalised`| Whitespace noise `" PAID "`, `"usd"` | Normalised to `paid` and `USD` |
+| **Idempotency** | `test_publish_idempotency.py::test_rerun_no_duplicates` | Rerunning identical batch | `inserted=0, updated=0`, hash identical |
+| **Idempotency** | `test_publish_idempotency.py::test_stale_update_does_not_overwrite` | Late data with older version timestamp| Counted as `skipped_stale`, target intact |
+| **Idempotency** | `test_publish_idempotency.py::test_publish_empty_dataframe` | Publishing 0 valid records | Empty target created with header |
+| **Reconciliation** | `test_reconcile.py::test_amount_tolerance` | Amount diff within 0.005 vs 0.006 | 0.004 passes, 0.006 flags mismatch |
+| **Reconciliation** | `test_reconcile.py::test_aggregate_mismatch_flagged` | Target aggregate sum corrupted | Failing aggregate named in report |
+| **Reconciliation** | `test_reconcile.py::test_key_differences` | Injected missing and extra keys | Correct sets isolated |
+| **Reconciliation** | `test_reconcile.py::test_reconcile_handles_missing_target_file_gracefully` | Target file completely missing | Flags all source keys as missing |
+| **Seeded Generator** | `test_generator_labels.py::test_same_seed_same_bytes` | Seed 12345 run twice | Byte-identical files generated |
+| **Seeded Generator** | `test_generator_labels.py::test_recon_matches_injected_labels` | Drifted target audit | 100% of injected defects identified |
+| **Edge Cases** | `test_edge_cases.py::test_empty_batch` | Header-only empty batch | `SUCCESS_EMPTY`, 0 rows, recon PASS |
+| **Edge Cases** | `test_edge_cases.py::test_missing_column_fails_run` | Run on file with missing column | Exits with code 2 |
+| **Edge Cases** | `test_edge_cases.py::test_publish_crash_leaves_target_intact_then_retry_succeeds` | Crash simulated during atomic write | Target intact, retry succeeds |
+| **Integration** | `test_end_to_end.py::test_happy_path_pipeline_and_reconcile`| Generate -> Run -> Reconcile | Manifest recorded, report PASS |
+
+### 9.3 Mutation Testing (Proof of Detection)
+To verify that the reconciliation engine is sensitive to corruptions rather than a false-positive rubber stamp, a mutation test was conducted:
+1. `output/target/fact_orders.csv` was modified by corrupting a single amount from `99.99` to `119.99`.
+2. Running `python -m recon reconcile` immediately flagged `sum_amount` aggregate failure, isolated the order key in `field_mismatches.csv`, and exited with code 1.
+3. Reverting the file returned the result to `PASS` with exit code 0.
+
+---
+
+## 10. Performance Benchmarks & Optimization
+
+Measured on an Intel/AMD x86_64 system running Windows 11 with Python 3.10.11:
+
+### 10.1 Stage Timings for 100,000 Orders (10,000 Customers)
+
+| Pipeline Phase | Measured Duration | Throughput |
+| :--- | :--- | :--- |
+| **Ingestion** | `0.793 s` | ~126,100 rows/s |
+| **Validation & Deduplication** | `33.803 s` | ~2,950 rows/s |
+| **Transformation** | `13.797 s` | ~7,250 rows/s |
+| **Publishing (Atomic Upsert)** | `0.631 s` | ~158,400 rows/s |
+| **Reconciliation (4 Tiers)** | `49.255 s` | ~2,030 rows/s |
+| **Total End-to-End** | **98.280 s** | **~1,017 rows/s** |
+
+### 10.2 Optimization Study: Vectorised Merge vs Naive Row Loop
+During field-level reconciliation, comparing all attributes row-by-row with `iterrows` introduces massive Python interpreter overhead. We implemented a vectorised inner-join using Pandas and NumPy column masks.
+
+- **Naive `iterrows` Loop (15,000 rows):** `2.445 s`
+- **Vectorised Pandas Merge (15,000 rows):** `0.104 s`
+- **Measured Speedup:** **23.6x faster**
+
+Full benchmark logs are preserved in [docs/PERFORMANCE.md](docs/PERFORMANCE.md) and [docs/evidence/benchmark.txt](docs/evidence/benchmark.txt).
+
+---
+
+## 11. Known Limitations & Next Steps
+
+1. **In-Memory Scale Limit:** Designed for datasets up to ~1,000,000 records. For >10M rows, transition execution to **DuckDB** or **PySpark**.
+2. **File Storage Format:** Currently outputs CSVs for inspection. In production, migrate target storage to columnar **Apache Parquet** partitioned by `order_date`.
+3. **History Preservation:** Superseded duplicates currently reside in quarantine. Next step: implement an append-only Slowly Changing Dimension Type 2 (SCD2) history table with `valid_from` and `valid_to` timestamps.
+4. **Orchestration:** Add Apache Airflow DAGs with Slack notifications triggered on exit code 1.
+
+Detailed architectural trade-offs are documented in [docs/DESIGN_NOTES.md](docs/DESIGN_NOTES.md).
+
+---
+
+## 12. AI Collaboration Disclosure
+
+This project was built in collaboration with the Antigravity AI coding CLI (Google Gemini 3.8 Flash).
+- All AI interaction prompts are logged with timestamps in [prompts/PROMPT_HISTORY.md](prompts/PROMPT_HISTORY.md).
+- Human review, design validation, precision adjustments, and caught edge cases are fully disclosed in [docs/AI_USAGE.md](docs/AI_USAGE.md).

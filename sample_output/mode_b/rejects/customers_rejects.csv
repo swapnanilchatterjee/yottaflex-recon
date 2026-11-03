@@ -1,0 +1,4 @@
+run_id,source_file,source_line_number,entity,business_key,reason_code,reason_detail,raw_record
+run_d17f36aa8c8d,customers.csv,52,customers,BAD_CUST_999,INVALID_FORMAT,customer_id 'BAD_CUST_999' does not match regex ^C\d{6}$,"BAD_CUST_999,Bad Customer,bad@example.com,US,2026-01-01T10:00:00Z,2026-01-01T12:00:00Z"
+run_d17f36aa8c8d,customers.csv,53,customers,C999001,MISSING_REQUIRED,"One or more required fields (customer_id, customer_name, country_code, created_at, updated_at) are blank","C999001,Missing Country,no_country@example.com,,2026-01-01T10:00:00Z,2026-01-01T12:00:00Z"
+run_d17f36aa8c8d,customers.csv,54,customers,C999002,INVALID_VALUE,updated_at (2026-01-01T10:00:00Z) cannot be earlier than created_at (2026-01-02T10:00:00Z),"C999002,Backwards Time,back@example.com,US,2026-01-02T10:00:00Z,2026-01-01T10:00:00Z"

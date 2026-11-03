@@ -1,0 +1,18 @@
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\Users\Me\Documents\Exp\Yotta
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.7.0
+collected 35 items
+
+tests\test_edge_cases.py ...                                             [  8%]
+tests\test_end_to_end.py .                                               [ 11%]
+tests\test_generator_labels.py ..                                        [ 17%]
+tests\test_ingest.py .....                                               [ 31%]
+tests\test_publish_idempotency.py ...                                    [ 40%]
+tests\test_reconcile.py ....                                             [ 51%]
+tests\test_transform.py ....                                             [ 62%]
+tests\test_validate.py .............                                     [100%]
+
+============================= 35 passed in 1.11s ==============================

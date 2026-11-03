@@ -1,0 +1,9 @@
+========================================
+RECONCILIATION RESULT: FAIL (Mismatches Detected)
+========================================
+Total mismatched records: 8
+Isolated mismatch reports written to output\mode_b\mismatches
+Full report written to output\mode_b\reconciliation_report.json
+
+STDERR:
+[2026-11-03T08:11:20Z] [INFO] [run_id:run_d17f36aa8c8d] Executing reconciliation between data\sample\source and data\sample\target_drifted

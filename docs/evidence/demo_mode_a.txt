@@ -1,0 +1,16 @@
+Run run_d17f36aa8c8d completed successfully. Target published to output\target
+Metrics: {'customers': {'inserted': 0, 'updated': 0, 'unchanged': 50, 'skipped_stale': 0}, 'orders': {'inserted': 0, 'updated': 0, 'unchanged': 200, 'skipped_stale': 0}}
+========================================
+RECONCILIATION RESULT: PASS
+========================================
+0 unexplained differences found. All keys, counts, and aggregates reconciled.
+Full report written to output\mode_a\reconciliation_report.json
+
+STDERR:
+[2026-11-03T08:11:18Z] [INFO] [run_id:run_d17f36aa8c8d] Starting pipeline execution for run run_d17f36aa8c8d
+[2026-11-03T08:11:18Z] [INFO] [run_id:run_d17f36aa8c8d] Ingesting source files from data\sample\source
+[2026-11-03T08:11:18Z] [INFO] [run_id:run_d17f36aa8c8d] Validating entities and checking referential integrity
+[2026-11-03T08:11:19Z] [INFO] [run_id:run_d17f36aa8c8d] Applying business transforms and normalisation
+[2026-11-03T08:11:19Z] [INFO] [run_id:run_d17f36aa8c8d] Publishing datasets to output\target
+[2026-11-03T08:11:19Z] [INFO] [run_id:run_d17f36aa8c8d] Pipeline completed successfully. Metrics: {'customers': {'inserted': 0, 'updated': 0, 'unchanged': 50, 'skipped_stale': 0}, 'orders': {'inserted': 0, 'updated': 0, 'unchanged': 200, 'skipped_stale': 0}}
+[2026-11-03T08:11:19Z] [INFO] [run_id:run_d17f36aa8c8d] Executing reconciliation between data\sample\source and output\target

@@ -1,0 +1,8 @@
+run_id,source_file,source_line_number,entity,business_key,reason_code,reason_detail,raw_record
+run_d17f36aa8c8d,orders.csv,202,orders,O99000001,INVALID_VALUE,"amount -50.00 outside valid range [0.00, 1000000.00]","O99000001,C000001,2026-01-05T10:00:00Z,paid,-50.00,USD,2026-01-05T10:05:00Z"
+run_d17f36aa8c8d,orders.csv,203,orders,O99000002,INVALID_VALUE,"status 'in_progress' not in allowed set ['cancelled', 'created', 'delivered', 'paid', 'refunded', 'shipped']","O99000002,C000001,2026-01-05T10:00:00Z,in_progress,120.00,USD,2026-01-05T10:05:00Z"
+run_d17f36aa8c8d,orders.csv,204,orders,O99000003,INVALID_VALUE,"currency 'BITCOIN' not in allowed set ['EUR', 'GBP', 'INR', 'USD']","O99000003,C000001,2026-01-05T10:00:00Z,paid,120.00,BITCOIN,2026-01-05T10:05:00Z"
+run_d17f36aa8c8d,orders.csv,205,orders,O99000004,INVALID_FK,customer_id 'C999999' does not reference any valid customer,"O99000004,C999999,2026-01-05T10:00:00Z,paid,75.00,USD,2026-01-05T10:05:00Z"
+run_d17f36aa8c8d,orders.csv,206,orders,O99000005,FUTURE_TIMESTAMP,order_ts 2030-01-01T10:00:00Z is in the future relative to 2026-11-03T02:39:08.319561+00:00,"O99000005,C000001,2030-01-01T10:00:00Z,paid,80.00,USD,2030-01-01T10:05:00Z"
+run_d17f36aa8c8d,orders.csv,208,orders,O99000007,MISSING_REQUIRED,One or more required fields are blank,"O99000007,C000001,,paid,100.00,USD,2026-01-01T08:15:00Z"
+run_d17f36aa8c8d,orders.csv,207,orders,O00000001,DUPLICATE_SUPERSEDED,Superseded by version at line 2,"O00000001,C000001,2026-01-01T08:00:00Z,created,10.00,USD,2026-01-01T08:15:00Z"

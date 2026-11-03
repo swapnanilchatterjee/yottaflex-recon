@@ -1,0 +1,106 @@
+{
+  "report_version": "1.0",
+  "run_id": "run_d17f36aa8c8d",
+  "generated_at": "2026-11-03T02:38:13Z",
+  "status": "PASS",
+  "tolerance": {
+    "amount": 0.005
+  },
+  "entities": {
+    "customers": {
+      "counts": {
+        "source_raw": 53,
+        "rejected": 3,
+        "expected_target": 50,
+        "actual_target": 50,
+        "unexplained_difference": 0
+      },
+      "keys": {
+        "missing_in_target": 0,
+        "extra_in_target": 0,
+        "duplicate_in_target": 0
+      },
+      "aggregates": [
+        {
+          "name": "row_count",
+          "source": 50,
+          "target": 50,
+          "diff": 0,
+          "pass": true
+        },
+        {
+          "name": "distinct_countries",
+          "source": 8,
+          "target": 8,
+          "diff": 0,
+          "pass": true
+        }
+      ],
+      "field_checks": {
+        "compared_rows": 50,
+        "mismatched_rows": 0,
+        "by_column": {}
+      }
+    },
+    "orders": {
+      "counts": {
+        "source_raw": 207,
+        "rejected": 7,
+        "expected_target": 200,
+        "actual_target": 200,
+        "unexplained_difference": 0
+      },
+      "keys": {
+        "missing_in_target": 0,
+        "extra_in_target": 0,
+        "duplicate_in_target": 0
+      },
+      "aggregates": [
+        {
+          "name": "row_count",
+          "source": 200,
+          "target": 200,
+          "diff": 0,
+          "pass": true
+        },
+        {
+          "name": "sum_amount",
+          "source": 22093155.05,
+          "target": 22093155.05,
+          "diff": 0.0,
+          "pass": true
+        },
+        {
+          "name": "min_amount",
+          "source": 0.0,
+          "target": 0.0,
+          "diff": 0.0,
+          "pass": true
+        },
+        {
+          "name": "max_amount",
+          "source": 1000000.0,
+          "target": 1000000.0,
+          "diff": 0.0,
+          "pass": true
+        },
+        {
+          "name": "distinct_customers",
+          "source": 50,
+          "target": 50,
+          "diff": 0,
+          "pass": true
+        }
+      ],
+      "field_checks": {
+        "compared_rows": 200,
+        "mismatched_rows": 0,
+        "by_column": {}
+      }
+    }
+  },
+  "summary": {
+    "total_mismatched_records": 0,
+    "checks_failed": []
+  }
+}
