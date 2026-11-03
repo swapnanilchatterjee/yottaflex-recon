@@ -127,7 +127,7 @@ Complete column constraints, data types, nullability, and derivations are docume
 ## 5. Naming & Lineage Conventions
 
 - **Naming Convention:** All table names, column names, and file names strictly follow `snake_case` using lowercase alphanumeric characters separated by underscores (`_`). Examples: `customer_id`, `dim_customers.csv`, `order_ts_utc`.
-- **Timestamp Standard:** Canonical ISO-8601 UTC with explicit `Z` suffix (`YYYY-MM-DDTHH:MM:SSZ`). Timestamps containing timezone offsets (e.g. `+05:30`) are converted to UTC upon ingest.
+- **Timestamp Standard:** Canonical ISO-8601 UTC with explicit `Z` suffix (`YYYY-MM-DDTHH:MM:SSZ`). Timestamps containing timezone offsets (e.g. `+05:30`) are converted to UTC during the transform stage.
 - **Deterministic Run Identifier (`run_id`):**
   Computed deterministically from the SHA-256 hash of all input file bytes concatenated with the pipeline version string:
   ```
@@ -223,7 +223,7 @@ A comprehensive quality assurance suite was executed covering unit, negative, bo
 | **Idempotency** | `test_publish_idempotency.py::test_rerun_no_duplicates` | Rerunning identical batch | `inserted=0, updated=0`, hash identical |
 | **Idempotency** | `test_publish_idempotency.py::test_stale_update_does_not_overwrite` | Late data with older version timestamp| Counted as `skipped_stale`, target intact |
 | **Idempotency** | `test_publish_idempotency.py::test_publish_empty_dataframe` | Publishing 0 valid records | Empty target created with header |
-| **Reconciliation** | `test_reconcile.py::test_amount_tolerance` | Amount diff within 0.005 vs 0.006 | 0.004 passes, 0.006 flags mismatch |
+| **Reconciliation** | `test_reconcile.py::test_amount_tolerance` | Amount diff of 0.004 vs 0.006 against a 0.005 tolerance | 0.004 passes, 0.006 flags mismatch |
 | **Reconciliation** | `test_reconcile.py::test_aggregate_mismatch_flagged` | Target aggregate sum corrupted | Failing aggregate named in report |
 | **Reconciliation** | `test_reconcile.py::test_key_differences` | Injected missing and extra keys | Correct key sets isolated |
 | **Reconciliation** | `test_reconcile.py::test_reconcile_handles_missing_target_file_gracefully` | Target file completely missing | Flags all source keys as missing |
@@ -251,9 +251,9 @@ Measured on an Intel/AMD x86_64 system running Windows 11 with Python 3.10.11:
 | Pipeline Phase | Measured Duration | Throughput |
 | :--- | :--- | :--- |
 | **Ingestion** | `0.793 s` | ~126,100 rows/s |
-| **Validation & Deduplication** | `33.803 s` | ~2,950 rows/s |
+| **Validation & Deduplication** | `33.803 s` | ~2,960 rows/s |
 | **Transformation** | `13.797 s` | ~7,250 rows/s |
-| **Publishing (Atomic Upsert)** | `0.631 s` | ~158,400 rows/s |
+| **Publishing (Atomic Upsert)** | `0.631 s` | ~158,500 rows/s |
 | **Reconciliation (4 Tiers)** | `49.255 s` | ~2,030 rows/s |
 | **Total End-to-End** | **98.280 s** | **~1,017 rows/s** |
 
@@ -262,7 +262,7 @@ During field-level reconciliation, comparing all attributes row-by-row with `ite
 
 - **Naive `iterrows` Loop (15,000 rows):** `2.445 s`
 - **Vectorised Pandas Merge (15,000 rows):** `0.104 s`
-- **Measured Speedup:** **23.6x faster**
+- **Measured Speedup:** **23.5x faster**
 
 Full benchmark logs are preserved in [docs/PERFORMANCE.md](docs/PERFORMANCE.md) and [docs/evidence/benchmark.txt](docs/evidence/benchmark.txt).
 
@@ -270,7 +270,7 @@ Full benchmark logs are preserved in [docs/PERFORMANCE.md](docs/PERFORMANCE.md) 
 
 ## 11. Known Limitations & Next Steps
 
-1. **In-Memory Scale Limit:** Designed for datasets up to ~1,000,000 records. For >10M rows, transition execution to **DuckDB** or **PySpark**.
+1. **In-Memory Scale Limit:** Designed for datasets up to ~1,000,000 records. For larger datasets (>1M rows), transition execution to **DuckDB** or **PySpark**.
 2. **File Storage Format:** Currently outputs CSVs for inspection. In production, migrate target storage to columnar **Apache Parquet** partitioned by `order_date`.
 3. **History Preservation:** Superseded duplicates currently reside in quarantine. Next step: implement an append-only Slowly Changing Dimension Type 2 (SCD2) history table with `valid_from` and `valid_to` timestamps.
 4. **Orchestration:** Add Apache Airflow DAGs with Slack notifications triggered on exit code 1.
