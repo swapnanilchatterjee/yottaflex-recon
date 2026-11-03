@@ -53,9 +53,16 @@ output/
 # Large data volumes (reproducible via make large / generator)
 data/large/
 
-# Candidate personal interview notes & confidential briefing
+# Candidate personal interview notes, study guides & confidential planning
 INTERVIEW_PREP.md
 INTERVIEW_NOTES.md
+PLAN.md
+docs/PLAN.md
+docs/INTERVIEW_CHEATSHEET.md
+
+# Assessment prompts & company challenge PDFs
+*.pdf
+yotta_direct.txt
 
 # OS generated files
 .DS_Store
