@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "seed": 42,
+    "num_customers": 50,
+    "num_orders": 200
+  },
+  "source_rejects": {
+    "customers": {
+      "invalid_format": [
+        "BAD_CUST_999"
+      ],
+      "missing_required": [
+        "C999001"
+      ],
+      "invalid_value_time": [
+        "C999002"
+      ]
+    },
+    "orders": {
+      "missing_required": [
+        "O99000007"
+      ],
+      "invalid_format": [],
+      "invalid_value_amount": [
+        "O99000001"
+      ],
+      "invalid_value_status": [
+        "O99000002"
+      ],
+      "invalid_value_currency": [
+        "O99000003"
+      ],
+      "future_timestamp": [
+        "O99000005"
+      ],
+      "invalid_fk": [
+        "O99000004"
+      ],
+      "duplicate_superseded": [
+        "O00000001"
+      ]
+    }
+  },
+  "target_drift_findings": {
+    "missing_in_target": [
+      "O00000003",
+      "O00000004"
+    ],
+    "extra_in_target": [
+      "O_EXTRA_9001",
+      "O_EXTRA_9002"
+    ],
+    "duplicate_in_target": [
+      "O00000001"
+    ],
+    "amount_mismatches": [
+      "O00000007"
+    ],
+    "status_mismatches": [
+      "O00000009"
+    ]
+  }
+}
