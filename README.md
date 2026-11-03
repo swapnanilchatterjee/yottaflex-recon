@@ -50,7 +50,11 @@ The demo demonstrates the engine across two distinct operational modes:
    - Validates data types, constraints, and referential integrity; supersedes duplicate keys; quarantines bad records to `output/mode_a/rejects/`.
    - Publishes target clean analytical tables: `output/target/dim_customers.csv` and `output/target/fact_orders.csv`.
    - Executes reconciliation: **Exits with code 0 (PASS)**. Demonstrates the core count equation:
-     $$\text{source\_raw\_rows} = \text{expected\_target\_rows} + \text{rejected\_rows}$$
+
+     ```text
+     source_raw_rows = expected_target_rows + rejected_rows
+     ```
+
      Every difference is fully accounted for by quarantined rejects (0 unexplained differences).
 2. **Mode B — Drift & Corruption Detection:**
    - Reconciles source extracts against `data/sample/target_drifted/` (an independently modified target with deliberate row deletions, phantom rows, duplicate keys, and altered field values).
